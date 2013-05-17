@@ -11,6 +11,8 @@ namespace ThreadSafeTest
     public class Cache
     {
         readonly string _cachePath;
+        readonly object _readlock;
+        readonly object _writeLock;
 
         #region Singleton business
         private Cache()
@@ -20,6 +22,8 @@ namespace ThreadSafeTest
                 Directory.CreateDirectory( Configuration.ResourceDirectory );
             }
             _cachePath = Path.Combine( Configuration.ResourceDirectory, Configuration.CacheFileName );
+            _readlock = new object();
+            _writeLock = new object();
         }
 
         // type initializer
@@ -37,7 +41,7 @@ namespace ThreadSafeTest
             // the cache deletion
             if( IsCacheReady() )
             {
-                lock( Instance )
+                lock( _readlock )
                 {
                     if( IsCacheReady() )
                     {
@@ -55,7 +59,7 @@ namespace ThreadSafeTest
             // the cache building
             if( !IsCacheReady() )
             {
-                lock( Instance )
+                lock( _writeLock )
                 {
                     if( !IsCacheReady() )
                     {
@@ -85,8 +89,11 @@ namespace ThreadSafeTest
 
         string AccessCache()
         {
-            Console.WriteLine( "Cache accessed" );
-            return File.ReadAllText( _cachePath );
+            lock( _readlock )
+            {
+                Console.WriteLine( "Cache accessed" );
+                return File.ReadAllText( _cachePath );
+            }
         }
     }
 }
