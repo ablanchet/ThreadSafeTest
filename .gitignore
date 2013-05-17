@@ -1,0 +1,3 @@
+ThreadSafeTest/bin/*
+ThreadSafeTest/obj/
+*.suo
