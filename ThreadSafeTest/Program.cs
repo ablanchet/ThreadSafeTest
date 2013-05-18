@@ -35,13 +35,13 @@ namespace ThreadSafeTest
             Task.Factory.StartNew( () =>
             {
                 Console.WriteLine( "Task 1 asking to get the cache" );
-                Console.WriteLine( "Content 1 :" + Cache.Instance.GetContent( database ) );
+                Console.WriteLine( "Content 1 :" + Cache.GetContent( database ) );
             } ).ContinueWith( ( cleanTask ) => Console.WriteLine( "Exception in task 1 : {0}", cleanTask.Exception.Flatten() ), TaskContinuationOptions.OnlyOnFaulted );
 
             Task task2 = Task.Factory.StartNew( () =>
             {
                 Console.WriteLine( "Task 2 asking to get the cache" );
-                Console.WriteLine( "Content 2 :" + Cache.Instance.GetContent( database ) );
+                Console.WriteLine( "Content 2 :" + Cache.GetContent( database ) );
             } ).ContinueWith( ( cleanTask ) => Console.WriteLine( "Exception in task 2 : {0}", cleanTask.Exception.Flatten() ), TaskContinuationOptions.OnlyOnFaulted );
 
             // when the task 2 is finished, try to delete the cache from two tasks in parallel
@@ -50,13 +50,13 @@ namespace ThreadSafeTest
                 Task.Factory.StartNew( () =>
                 {
                     Console.WriteLine( "Task asking to clean the cache" );
-                    Cache.Instance.Clean();
+                    Cache.Clean();
                 } ).ContinueWith( ( cleanTask ) => Console.WriteLine( "Exception in task 4 : {0}", cleanTask.Exception.Flatten() ), TaskContinuationOptions.OnlyOnFaulted );
 
                 Task.Factory.StartNew( () =>
                 {
                     Console.WriteLine( "Task asking to clean the cache" );
-                    Cache.Instance.Clean();
+                    Cache.Clean();
                 } ).ContinueWith( ( cleanTask ) => Console.WriteLine( "Exception in task 5 : {0}", cleanTask.Exception.Flatten() ), TaskContinuationOptions.OnlyOnFaulted );
 
             } );
@@ -68,7 +68,7 @@ namespace ThreadSafeTest
             Task.Factory.StartNew( () =>
             {
                 Console.WriteLine( "Task asking to clean the cache" );
-                Cache.Instance.Clean();
+                Cache.Clean();
             } ).ContinueWith( ( cleanTask ) => Console.WriteLine( "Exception in task 3 : {0}", cleanTask.Exception.Flatten() ), TaskContinuationOptions.OnlyOnFaulted );
 
             Console.Read();

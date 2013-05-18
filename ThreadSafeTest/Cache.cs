@@ -10,30 +10,20 @@ namespace ThreadSafeTest
 {
     public class Cache
     {
-        readonly string _cachePath;
-        readonly object _readlock;
-        readonly object _writeLock;
+        static string _cachePath;
+        static object _lock;
 
-        #region Singleton business
-        private Cache()
+        static int _readAccessCount;
+
+        static Cache()
         {
             if( !Directory.Exists( Configuration.ResourceDirectory ) ) Directory.CreateDirectory( Configuration.ResourceDirectory );
 
             _cachePath = Path.Combine( Configuration.ResourceDirectory, Configuration.CacheFileName );
-            _readlock = new object();
-            _writeLock = new object();
+            _lock = new object();
         }
 
-        // type initializer
-        static Cache()
-        {
-            Instance = new Cache();
-        }
-
-        public static Cache Instance { get; private set; }
-        #endregion
-
-        public void Clean()
+        public static void Clean()
         {
             // double check locking around
             // the cache deletion
@@ -41,7 +31,7 @@ namespace ThreadSafeTest
             {
                 // this lock avoid deleting cache while requesting it
                 // and avoid deleting the cache while it's already been deleting by another thread
-                lock( _readlock )
+                lock( _lock )
                 {
                     if( IsCacheReady() )
                     {
@@ -53,14 +43,14 @@ namespace ThreadSafeTest
             }
         }
 
-        public string GetContent( FakeDatabase database )
+        public static string GetContent( FakeDatabase database )
         {
             // double check locking around 
             // the cache building
             if( !IsCacheReady() )
             {
                 // this lock avoid building an already in built cache
-                lock( _writeLock )
+                lock( _lock )
                 {
                     if( !IsCacheReady() )
                     {
@@ -74,12 +64,12 @@ namespace ThreadSafeTest
         }
 
 
-        private bool IsCacheReady()
+        private static bool IsCacheReady()
         {
             return File.Exists( _cachePath );
         }
 
-        private void Build( FakeDatabase database )
+        private static void Build( FakeDatabase database )
         {
             Thread.Sleep( 5000 );
             using( var stream = File.CreateText( _cachePath ) )
@@ -89,15 +79,13 @@ namespace ThreadSafeTest
             Console.WriteLine( "Cache built" );
         }
 
-        private string RetrieveData()
+        private static string RetrieveData()
         {
-            // lock the cache while reading it
-            // to avoid other thread to delete it while reading
-            lock( _readlock )
-            {
-                Console.WriteLine( "Cache accessed" );
-                return File.ReadAllText( _cachePath );
-            }
+            Console.WriteLine( "Cache accessed" );
+            Interlocked.Increment( ref _readAccessCount );
+            string data = File.ReadAllText( _cachePath );
+            Interlocked.Decrement( ref _readAccessCount );
+            return data;
         }
     }
 }
