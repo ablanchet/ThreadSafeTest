@@ -11,8 +11,7 @@ namespace ThreadSafeTest
     public class Cache
     {
         static string _cachePath;
-        static object _cacheBuildLock;
-        static object _cacheCleanLock;
+        static object _lock;
 
         static long _readAccessCount;
         static ManualResetEvent _cleanResetEvent = new ManualResetEvent( true );
@@ -24,8 +23,7 @@ namespace ThreadSafeTest
 
             _cachePath = Path.Combine( Configuration.ResourceDirectory, Configuration.CacheFileName );
 
-            _cacheBuildLock = new object();
-            _cacheCleanLock = new object();
+            _lock = new object();
         }
 
         public static void Clean()
@@ -35,7 +33,7 @@ namespace ThreadSafeTest
             if( IsCacheReady() )
             {
                 _cleanResetEvent.WaitOne();
-                lock( _cacheCleanLock )
+                lock( _lock )
                 {
                     if( IsCacheReady() )
                     {
@@ -70,7 +68,7 @@ namespace ThreadSafeTest
             if( !IsCacheReady() )
             {
                 // this lock avoid building an already in built cache
-                lock( _cacheBuildLock )
+                lock( _lock )
                 {
                     if( !IsCacheReady() )
                     {
