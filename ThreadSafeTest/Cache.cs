@@ -67,7 +67,6 @@ namespace ThreadSafeTest
             // the cache building
             if( !IsCacheReady() )
             {
-                // this lock avoid building an already in built cache
                 lock( _lock )
                 {
                     if( !IsCacheReady() )
