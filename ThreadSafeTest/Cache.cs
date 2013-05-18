@@ -11,17 +11,21 @@ namespace ThreadSafeTest
     public class Cache
     {
         static string _cachePath;
-        static object _lock;
+        static object _cacheBuildLock;
+        static object _cacheCleanLock;
 
         static long _readAccessCount;
-        static ManualResetEvent _mre = new ManualResetEvent( true );
+        static ManualResetEvent _cleanResetEvent = new ManualResetEvent( true );
+        static ManualResetEvent _readResetEvent = new ManualResetEvent( true );
 
         static Cache()
         {
             if( !Directory.Exists( Configuration.ResourceDirectory ) ) Directory.CreateDirectory( Configuration.ResourceDirectory );
 
             _cachePath = Path.Combine( Configuration.ResourceDirectory, Configuration.CacheFileName );
-            _lock = new object();
+
+            _cacheBuildLock = new object();
+            _cacheCleanLock = new object();
         }
 
         public static void Clean()
@@ -30,19 +34,16 @@ namespace ThreadSafeTest
             // the cache deletion
             if( IsCacheReady() )
             {
-                // this lock avoid deleting cache while requesting it
-                // and avoid deleting the cache while it's already been deleting by another thread
-                lock( _lock )
+                _cleanResetEvent.WaitOne();
+                lock( _cacheCleanLock )
                 {
                     if( IsCacheReady() )
                     {
-                        _mre.WaitOne();
-                        if( IsCacheReady() )
-                        {
-                            Thread.Sleep( 2000 );
-                            File.Delete( _cachePath );
-                            Console.WriteLine( "Cache cleaned" );
-                        }
+                        _readResetEvent.Reset();
+                        Thread.Sleep( 2000 );
+                        File.Delete( _cachePath );
+                        Console.WriteLine( "Cache cleaned" );
+                        _readResetEvent.Set();
                     }
                 }
             }
@@ -50,12 +51,26 @@ namespace ThreadSafeTest
 
         public static string GetContent( FakeDatabase database )
         {
+            CreateCache( database );
+
+            _cleanResetEvent.WaitOne();
+
+            CreateCache( database );
+
+            // now we are sure the cache exists
+            // then let the thread access the cache 
+
+            return RetrieveData();
+        }
+
+        private static void CreateCache( FakeDatabase database )
+        {
             // double check locking around 
             // the cache building
             if( !IsCacheReady() )
             {
                 // this lock avoid building an already in built cache
-                lock( _lock )
+                lock( _cacheBuildLock )
                 {
                     if( !IsCacheReady() )
                     {
@@ -63,11 +78,7 @@ namespace ThreadSafeTest
                     }
                 }
             }
-            // now we are sure the cache exists
-            // then let the thread access the cache 
-            return RetrieveData();
         }
-
 
         private static bool IsCacheReady()
         {
@@ -91,20 +102,20 @@ namespace ThreadSafeTest
             AccessCountChanged();
 
             string data = File.ReadAllText( _cachePath );
-            
+
             Interlocked.Decrement( ref _readAccessCount );
             AccessCountChanged();
             Console.WriteLine( "Cache accessed" );
-            
+
             return data;
         }
 
         static void AccessCountChanged()
         {
             if( Interlocked.Read( ref _readAccessCount ) == 0 )
-                _mre.Set();
+                _cleanResetEvent.Set();
             else
-                _mre.Reset();
+                _cleanResetEvent.Reset();
         }
     }
 }
