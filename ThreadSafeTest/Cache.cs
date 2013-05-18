@@ -13,7 +13,8 @@ namespace ThreadSafeTest
         static string _cachePath;
         static object _lock;
 
-        static int _readAccessCount;
+        static long _readAccessCount;
+        static ManualResetEvent _mre = new ManualResetEvent( true );
 
         static Cache()
         {
@@ -35,9 +36,13 @@ namespace ThreadSafeTest
                 {
                     if( IsCacheReady() )
                     {
-                        Thread.Sleep( 2000 );
-                        File.Delete( _cachePath );
-                        Console.WriteLine( "Cache cleaned" );
+                        _mre.WaitOne();
+                        if( IsCacheReady() )
+                        {
+                            Thread.Sleep( 2000 );
+                            File.Delete( _cachePath );
+                            Console.WriteLine( "Cache cleaned" );
+                        }
                     }
                 }
             }
@@ -81,11 +86,25 @@ namespace ThreadSafeTest
 
         private static string RetrieveData()
         {
-            Console.WriteLine( "Cache accessed" );
+            Console.WriteLine( "Cache accessing" );
             Interlocked.Increment( ref _readAccessCount );
+            AccessCountChanged();
+
             string data = File.ReadAllText( _cachePath );
+            
             Interlocked.Decrement( ref _readAccessCount );
+            AccessCountChanged();
+            Console.WriteLine( "Cache accessed" );
+            
             return data;
+        }
+
+        static void AccessCountChanged()
+        {
+            if( Interlocked.Read( ref _readAccessCount ) == 0 )
+                _mre.Set();
+            else
+                _mre.Reset();
         }
     }
 }

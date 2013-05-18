@@ -1,3 +1,5 @@
 ThreadSafeTest/bin/*
 ThreadSafeTest/obj/
 *.suo
+*/bin/**
+*/obj/**
