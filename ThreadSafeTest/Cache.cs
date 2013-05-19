@@ -13,9 +13,7 @@ namespace ThreadSafeTest
         static string _cachePath;
         static object _lock;
 
-        static long _readAccessCount;
-        static ManualResetEvent _cleanResetEvent = new ManualResetEvent( true );
-        static ManualResetEvent _readResetEvent = new ManualResetEvent( true );
+        static CountdownEvent _readCount = new CountdownEvent( 0 );
 
         static Cache()
         {
@@ -32,16 +30,13 @@ namespace ThreadSafeTest
             // the cache deletion
             if( IsCacheReady() )
             {
-                _cleanResetEvent.WaitOne();
+                _readCount.Wait();
                 lock( _lock )
                 {
                     if( IsCacheReady() )
                     {
-                        _readResetEvent.Reset();
-                        Thread.Sleep( 2000 );
                         File.Delete( _cachePath );
                         Console.WriteLine( "Cache cleaned" );
-                        _readResetEvent.Set();
                     }
                 }
             }
@@ -49,10 +44,6 @@ namespace ThreadSafeTest
 
         public static string GetContent( FakeDatabase database )
         {
-            CreateCache( database );
-
-            _cleanResetEvent.WaitOne();
-
             CreateCache( database );
 
             // now we are sure the cache exists
@@ -84,7 +75,6 @@ namespace ThreadSafeTest
 
         private static void Build( FakeDatabase database )
         {
-            Thread.Sleep( 5000 );
             using( var stream = File.CreateText( _cachePath ) )
             {
                 foreach( string data in database.GetData() ) stream.Write( data + " " );
@@ -94,25 +84,14 @@ namespace ThreadSafeTest
 
         private static string RetrieveData()
         {
-            Console.WriteLine( "Cache accessing" );
-            Interlocked.Increment( ref _readAccessCount );
-            AccessCountChanged();
+            if( !_readCount.TryAddCount() ) _readCount.Reset( 1 );
 
+            Console.WriteLine( "Thread {0} is reading data, read count is at {1}", Thread.CurrentThread.ManagedThreadId, _readCount.CurrentCount );
             string data = File.ReadAllText( _cachePath );
-
-            Interlocked.Decrement( ref _readAccessCount );
-            AccessCountChanged();
-            Console.WriteLine( "Cache accessed" );
+            
+            _readCount.Signal();
 
             return data;
-        }
-
-        static void AccessCountChanged()
-        {
-            if( Interlocked.Read( ref _readAccessCount ) == 0 )
-                _cleanResetEvent.Set();
-            else
-                _cleanResetEvent.Reset();
         }
     }
 }

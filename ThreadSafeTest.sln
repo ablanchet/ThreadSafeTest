@@ -5,6 +5,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ThreadSafeTest", "ThreadSaf
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WaitHandleTest", "WaitHandleTest\WaitHandleTest.csproj", "{B7E605CC-7FBB-4664-921C-569C451895A8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CountdownEventTest", "CountdownEventTest\CountdownEventTest.csproj", "{9D067E22-AB0D-4A29-8408-06FCB81BF163}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -19,6 +21,10 @@ Global
 		{B7E605CC-7FBB-4664-921C-569C451895A8}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B7E605CC-7FBB-4664-921C-569C451895A8}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B7E605CC-7FBB-4664-921C-569C451895A8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9D067E22-AB0D-4A29-8408-06FCB81BF163}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9D067E22-AB0D-4A29-8408-06FCB81BF163}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9D067E22-AB0D-4A29-8408-06FCB81BF163}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9D067E22-AB0D-4A29-8408-06FCB81BF163}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

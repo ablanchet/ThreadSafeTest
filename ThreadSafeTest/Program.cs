@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -28,48 +29,58 @@ namespace ThreadSafeTest
 
     class Program
     {
+        static Task GetNewTask( string name, Action<string> action )
+        {
+            Task task = Task.Factory.StartNew( () =>
+            {
+                Console.WriteLine( "Starting task {0}", name );
+                action(name);
+            } );
+
+            task.ContinueWith( ( t ) => Console.WriteLine( "Task {0} finished", name ) );
+            task.ContinueWith( ( t ) => Console.WriteLine( "Exception in {0} : {1}", name, t.Exception.Flatten() ), TaskContinuationOptions.OnlyOnFaulted );
+
+            return task;
+        }
+
         static void Main( string[] args )
         {
             FakeDatabase database = new FakeDatabase();
 
-            Task.Factory.StartNew( () =>
+            GetNewTask( "Read 1", ( taskName ) =>
             {
-                Console.WriteLine( "Task 1 asking to get the cache" );
+                Console.WriteLine( "{0} asking to get the cache", taskName );
                 Console.WriteLine( "Content 1 :" + Cache.GetContent( database ) );
-            } ).ContinueWith( ( cleanTask ) => Console.WriteLine( "Exception in task 1 : {0}", cleanTask.Exception.Flatten() ), TaskContinuationOptions.OnlyOnFaulted );
+            } );
 
-            Task task2 = Task.Factory.StartNew( () =>
+            GetNewTask( "Read 2", ( taskName ) =>
             {
-                Console.WriteLine( "Task 2 asking to get the cache" );
+                Console.WriteLine( "{0} asking to get the cache", taskName );
                 Console.WriteLine( "Content 2 :" + Cache.GetContent( database ) );
-            } ).ContinueWith( ( cleanTask ) => Console.WriteLine( "Exception in task 2 : {0}", cleanTask.Exception.Flatten() ), TaskContinuationOptions.OnlyOnFaulted );
-
-            // when the task 2 is finished, try to delete the cache from two tasks in parallel
-            task2.ContinueWith( ( t ) =>
+            } ).ContinueWith( ( t ) =>
             {
-                Task.Factory.StartNew( () =>
+                // when the task 2 is finished, try to delete the cache from two tasks in parallel
+                GetNewTask( "Clean 2", ( taskName ) =>
                 {
-                    Console.WriteLine( "Task asking to clean the cache" );
+                    Console.WriteLine( "{0} asking to clean the cache", taskName );
                     Cache.Clean();
-                } ).ContinueWith( ( cleanTask ) => Console.WriteLine( "Exception in task 4 : {0}", cleanTask.Exception.Flatten() ), TaskContinuationOptions.OnlyOnFaulted );
+                } );
 
-                Task.Factory.StartNew( () =>
+                GetNewTask( "Clean 3", ( taskName ) =>
                 {
-                    Console.WriteLine( "Task asking to clean the cache" );
+                    Console.WriteLine( "{0} asking to clean the cache", taskName );
                     Cache.Clean();
-                } ).ContinueWith( ( cleanTask ) => Console.WriteLine( "Exception in task 5 : {0}", cleanTask.Exception.Flatten() ), TaskContinuationOptions.OnlyOnFaulted );
+                } );
 
             } );
 
-            Thread.Sleep( 200 );
-
             // this will not delete anything because the cache is not built yet
             // there is nothing to delete
-            Task.Factory.StartNew( () =>
+            GetNewTask( "Clean 1", ( taskName ) =>
             {
-                Console.WriteLine( "Task asking to clean the cache" );
+                Console.WriteLine( "{0} asking to clean the cache", taskName );
                 Cache.Clean();
-            } ).ContinueWith( ( cleanTask ) => Console.WriteLine( "Exception in task 3 : {0}", cleanTask.Exception.Flatten() ), TaskContinuationOptions.OnlyOnFaulted );
+            } );
 
             Console.Read();
         }
