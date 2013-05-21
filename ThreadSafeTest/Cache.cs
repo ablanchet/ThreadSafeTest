@@ -45,29 +45,66 @@ namespace ThreadSafeTest
             }
         }
 
+        static int _tryRead = 0;
         static int _nbRead = 0;
+        static int _nbUpgradeableRead = 0;
 
         public static string GetContent( FakeDatabase database )
         {
+            if( IsCacheReady() )
+            {
+                _readWriteLock.EnterReadLock();
+                try
+                {
+                    Interlocked.Increment( ref _tryRead );// Only for log
+
+                    if( IsCacheReady() )
+                    {
+                        try
+                        {
+                            Interlocked.Increment( ref _nbRead );// Only for log
+                            Console.WriteLine( "======> \tParallel TryRead : {0}, Read : {1}", _tryRead, _nbRead );
+                            Console.WriteLine( "======> \tThread {0} is reading data", Thread.CurrentThread.ManagedThreadId );
+                            return GetCacheObject();
+                        }
+                        finally
+                        {
+                            Interlocked.Decrement( ref _nbRead );// Only for log
+                        }
+                    }
+
+                }
+                finally
+                {
+                    Interlocked.Decrement( ref _tryRead );// Only for log
+                    _readWriteLock.ExitReadLock();
+                }
+            }
+            
+            Console.WriteLine( "======> \tWait at the Upgradeable read gate" );
             _readWriteLock.EnterUpgradeableReadLock();
             try
             {
-                Interlocked.Increment( ref _nbRead );
-                Console.WriteLine( "======> Parallel read : {0}", _nbRead );
-
+                Console.WriteLine( "======> \tEnter Upgradeable read" );
                 CreateCache( database );
-
-                // now we are sure the cache exists
-                // then let the thread access the cache
-
+                Interlocked.Increment( ref _nbUpgradeableRead ); // Only for log
+                Console.WriteLine( "======> \tParallel Upgradeable read : {0}", _nbUpgradeableRead );
                 Console.WriteLine( "======> \tThread {0} is reading data", Thread.CurrentThread.ManagedThreadId );
-                return File.ReadAllText( _cachePath );
+                return GetCacheObject();
             }
             finally
             {
-                Interlocked.Decrement( ref _nbRead );
+                Interlocked.Decrement( ref _nbUpgradeableRead ); // Only for log
                 _readWriteLock.ExitUpgradeableReadLock();
             }
+        }
+
+        private static string GetCacheObject()
+        {
+            if( !_readWriteLock.IsReadLockHeld && !_readWriteLock.IsUpgradeableReadLockHeld )
+                throw new ApplicationException( "IsReadLockHeld = false && IsUpgradeableReadLockHeld = false : Build method must be in reader lock." );
+
+            return File.ReadAllText( _cachePath );
         }
 
         private static void CreateCache( FakeDatabase database )
@@ -105,6 +142,7 @@ namespace ThreadSafeTest
                 foreach( string data in database.GetData() ) stream.Write( data + " " );
             }
             Console.WriteLine( "======> \tCache built" );
+            Thread.Sleep( 3000 );
         }
     }
 }
