@@ -45,11 +45,16 @@ namespace ThreadSafeTest
             }
         }
 
+        static int _nbRead = 0;
+
         public static string GetContent( FakeDatabase database )
         {
             _readWriteLock.EnterUpgradeableReadLock();
             try
             {
+                Interlocked.Increment( ref _nbRead );
+                Console.WriteLine( "======> Parallel read : {0}", _nbRead );
+
                 CreateCache( database );
 
                 // now we are sure the cache exists
@@ -60,6 +65,7 @@ namespace ThreadSafeTest
             }
             finally
             {
+                Interlocked.Decrement( ref _nbRead );
                 _readWriteLock.ExitUpgradeableReadLock();
             }
         }
