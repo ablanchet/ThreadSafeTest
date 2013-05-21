@@ -31,14 +31,14 @@ namespace ThreadSafeTest
     {
         static Task GetNewTask( string name, Action<string> action )
         {
-            Task task = Task.Factory.StartNew( () =>
+            Task task = new Task( () =>
             {
-                Console.WriteLine( "Starting task {0}", name );
-                action(name);
+                Console.WriteLine( "{0} :\t Starting task", name );
+                action( name );
             } );
 
-            task.ContinueWith( ( t ) => Console.WriteLine( "Task {0} finished", name ) );
-            task.ContinueWith( ( t ) => Console.WriteLine( "Exception in {0} : {1}", name, t.Exception.Flatten() ), TaskContinuationOptions.OnlyOnFaulted );
+            task.ContinueWith( ( t ) => Console.WriteLine( "{0} :\t Task  finished", name ) );
+            task.ContinueWith( ( t ) => Console.WriteLine( "{0} :\t Exception in {0} : {1}", name, t.Exception.Flatten() ), TaskContinuationOptions.OnlyOnFaulted );
 
             return task;
         }
@@ -47,42 +47,78 @@ namespace ThreadSafeTest
         {
             FakeDatabase database = new FakeDatabase();
 
-            GetNewTask( "Read 1", ( taskName ) =>
+            int exNb = 0;
+
+            Parallel.For( 0, 10, (i) => 
+                {
+                    try
+                    {
+                        Calls( database );
+                    }
+                    catch( Exception ex ) 
+                    {
+                        Console.WriteLine( "Ex : {0}", ex );
+                        Interlocked.Increment( ref exNb );
+                    }
+                } );
+
+            Console.WriteLine( "!!!!!!!!! NB EXCEPTION : {0} !!!!!!!!!", exNb );
+
+            Console.ReadLine();
+        }
+
+        private static void Calls( FakeDatabase database )
+        {
+            Task r1 = GetNewTask( "Read 1", ( taskName ) =>
             {
-                Console.WriteLine( "{0} asking to get the cache", taskName );
-                Console.WriteLine( "Content 1 :" + Cache.GetContent( database ) );
+                Console.WriteLine( "{0} :\t Asking to get the cache", taskName );
+                Console.WriteLine( "{1} :\t Content : {0}", Cache.GetContent( database ), taskName );
             } );
 
-            GetNewTask( "Read 2", ( taskName ) =>
+            Task r2 = GetNewTask( "Read 2", ( taskName ) =>
             {
-                Console.WriteLine( "{0} asking to get the cache", taskName );
-                Console.WriteLine( "Content 2 :" + Cache.GetContent( database ) );
-            } ).ContinueWith( ( t ) =>
+                Console.WriteLine( "{0} :\t Asking to get the cache", taskName );
+                Console.WriteLine( "{1} :\t Content : {0}", Cache.GetContent( database ), taskName );
+            } );
+
+            Task continuation = r2.ContinueWith( ( t ) =>
             {
                 // when the task 2 is finished, try to delete the cache from two tasks in parallel
-                GetNewTask( "Clean 2", ( taskName ) =>
+                Task c2 = GetNewTask( "Clean 2", ( taskName ) =>
                 {
-                    Console.WriteLine( "{0} asking to clean the cache", taskName );
+                    Console.WriteLine( "{0} :\t Asking to clean the cache", taskName );
                     Cache.Clean();
                 } );
 
-                GetNewTask( "Clean 3", ( taskName ) =>
+                Task c3 = GetNewTask( "Clean 3", ( taskName ) =>
                 {
-                    Console.WriteLine( "{0} asking to clean the cache", taskName );
+                    Console.WriteLine( "{0} :\t Asking to clean the cache", taskName );
                     Cache.Clean();
                 } );
+
+                Parallel.Invoke( () => c2.Start(), () => c3.Start() );
+                Task.WaitAll( new Task[] { c2, c3 }, 2000 );
 
             } );
+
+            Parallel.Invoke( () => r1.Start(), () => r2.Start() );
 
             // this will not delete anything because the cache is not built yet
             // there is nothing to delete
-            GetNewTask( "Clean 1", ( taskName ) =>
+            Task c1 = GetNewTask( "Clean 1", ( taskName ) =>
             {
-                Console.WriteLine( "{0} asking to clean the cache", taskName );
+                Console.WriteLine( "{0} :\t Asking to clean the cache", taskName );
                 Cache.Clean();
             } );
 
-            Console.Read();
+            c1.Start();
+
+            Console.WriteLine( "{1} :\t Content : {0}", Cache.GetContent( database ), "Main" );
+
+            continuation.Wait( 2000 );
+
+            Console.WriteLine( "{1} :\t Content : {0}", Cache.GetContent( database ), "Main" );
+
         }
     }
 }

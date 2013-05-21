@@ -36,7 +36,7 @@ namespace ThreadSafeTest
                     if( IsCacheReady() )
                     {
                         File.Delete( _cachePath );
-                        Console.WriteLine( "Cache cleaned" );
+                        Console.WriteLine( "======> \tCache cleaned" );
                     }
                 }
             }
@@ -79,14 +79,14 @@ namespace ThreadSafeTest
             {
                 foreach( string data in database.GetData() ) stream.Write( data + " " );
             }
-            Console.WriteLine( "Cache built" );
+            Console.WriteLine( "======> \tCache built" );
         }
 
         private static string RetrieveData()
         {
             if( !_readCount.TryAddCount() ) _readCount.Reset( 1 );
 
-            Console.WriteLine( "Thread {0} is reading data, read count is at {1}", Thread.CurrentThread.ManagedThreadId, _readCount.CurrentCount );
+            Console.WriteLine( "======> \tThread {0} is reading data, read count is at {1}", Thread.CurrentThread.ManagedThreadId, _readCount.CurrentCount );
             string data = File.ReadAllText( _cachePath );
             
             _readCount.Signal();
