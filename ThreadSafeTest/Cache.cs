@@ -11,9 +11,8 @@ namespace ThreadSafeTest
     public class Cache
     {
         static string _cachePath;
-        static object _lock;
 
-        static CountdownEvent _readCount = new CountdownEvent( 0 );
+        readonly static ReaderWriterLockSlim _readWriteLock;
 
         static Cache()
         {
@@ -21,7 +20,7 @@ namespace ThreadSafeTest
 
             _cachePath = Path.Combine( Configuration.ResourceDirectory, Configuration.CacheFileName );
 
-            _lock = new object();
+            _readWriteLock = new ReaderWriterLockSlim();
         }
 
         public static void Clean()
@@ -30,26 +29,39 @@ namespace ThreadSafeTest
             // the cache deletion
             if( IsCacheReady() )
             {
-                _readCount.Wait();
-                lock( _lock )
+                _readWriteLock.EnterWriteLock();
+                try
                 {
                     if( IsCacheReady() )
                     {
                         File.Delete( _cachePath );
-                        Console.WriteLine( "Cache cleaned" );
+                        Console.WriteLine( "======> \tCache cleaned" );
                     }
+                }
+                finally
+                {
+                    _readWriteLock.ExitWriteLock();
                 }
             }
         }
 
         public static string GetContent( FakeDatabase database )
         {
-            CreateCache( database );
+            _readWriteLock.EnterUpgradeableReadLock();
+            try
+            {
+                CreateCache( database );
 
-            // now we are sure the cache exists
-            // then let the thread access the cache 
+                // now we are sure the cache exists
+                // then let the thread access the cache
 
-            return RetrieveData();
+                Console.WriteLine( "======> \tThread {0} is reading data", Thread.CurrentThread.ManagedThreadId );
+                return File.ReadAllText( _cachePath );
+            }
+            finally
+            {
+                _readWriteLock.ExitUpgradeableReadLock();
+            }
         }
 
         private static void CreateCache( FakeDatabase database )
@@ -58,12 +70,17 @@ namespace ThreadSafeTest
             // the cache building
             if( !IsCacheReady() )
             {
-                lock( _lock )
+                _readWriteLock.EnterWriteLock();
+                try
                 {
                     if( !IsCacheReady() )
                     {
                         Build( database );
                     }
+                }
+                finally
+                {
+                    _readWriteLock.ExitWriteLock();
                 }
             }
         }
@@ -75,23 +92,13 @@ namespace ThreadSafeTest
 
         private static void Build( FakeDatabase database )
         {
+            if( !_readWriteLock.IsWriteLockHeld ) throw new ApplicationException( "IsWriteLockHeld = false : Build method must be in writer lock." );
+
             using( var stream = File.CreateText( _cachePath ) )
             {
                 foreach( string data in database.GetData() ) stream.Write( data + " " );
             }
-            Console.WriteLine( "Cache built" );
-        }
-
-        private static string RetrieveData()
-        {
-            if( !_readCount.TryAddCount() ) _readCount.Reset( 1 );
-
-            Console.WriteLine( "Thread {0} is reading data, read count is at {1}", Thread.CurrentThread.ManagedThreadId, _readCount.CurrentCount );
-            string data = File.ReadAllText( _cachePath );
-            
-            _readCount.Signal();
-
-            return data;
+            Console.WriteLine( "======> \tCache built" );
         }
     }
 }
