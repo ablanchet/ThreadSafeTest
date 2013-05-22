@@ -46,6 +46,7 @@ namespace ThreadSafeTest
         static void Main( string[] args )
         {
             FakeDatabase database = new FakeDatabase();
+            Cache.Clean();
 
             int exNb = 0;
 
@@ -97,7 +98,7 @@ namespace ThreadSafeTest
                 } );
 
                 Parallel.Invoke( () => c2.Start(), () => c3.Start() );
-                Task.WaitAll( new Task[] { c2, c3 }, 2000 );
+                Task.WaitAll( new Task[] { c2, c3 } );
 
             } );
 
@@ -113,12 +114,14 @@ namespace ThreadSafeTest
 
             c1.Start();
 
-            Console.WriteLine( "{1} :\t Content : {0}", Cache.GetContent( database ), "Main" );
+            Task tm1 = Task.Factory.StartNew( () => Console.WriteLine( "{1} :\t Content : {0}", Cache.GetContent( database ), "Main" ) );
 
-            continuation.Wait( 2000 );
+            continuation.Wait();
 
-            Console.WriteLine( "{1} :\t Content : {0}", Cache.GetContent( database ), "Main" );
+            Task tm2 = Task.Factory.StartNew( () => Console.WriteLine( "{1} :\t Content : {0}", Cache.GetContent( database ), "Main" ) );
 
+            tm1.Wait();
+            tm2.Wait();
         }
     }
 }
